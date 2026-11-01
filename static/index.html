@@ -9,7 +9,6 @@
       --bg: #0f172a;
       --card-bg: #1e293b;
       --primary: #3b82f6;
-      --primary-hover: #2563eb;
       --accent: #10b981;
       --text: #f8fafc;
       --text-muted: #94a3b8;
@@ -18,99 +17,24 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: var(--bg); color: var(--text); padding: 24px; }
     .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-    
     header { text-align: center; margin-bottom: 10px; }
     header h1 { font-size: 26px; color: #fff; margin-bottom: 8px; }
     header p { color: var(--text-muted); font-size: 14px; }
-
     .main-grid { display: grid; grid-template-columns: 1fr 1.6fr; gap: 20px; }
     @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
-
     .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-    h2 { font-size: 16px; color: #e2e8f0; border-bottom: 1px solid var(--border); padding-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
-
-    /* 上传区域 */
-    .drop-zone {
-      border: 2px dashed var(--border);
-      border-radius: 8px;
-      padding: 40px 20px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .drop-zone:hover, .drop-zone.dragover { border-color: var(--primary); background: rgba(59, 130, 246, 0.05); }
+    h2 { font-size: 16px; color: #e2e8f0; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .drop-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+    .drop-zone:hover { border-color: var(--primary); background: rgba(59, 130, 246, 0.05); }
     .drop-zone input { display: none; }
-    .drop-zone p { color: var(--text-muted); font-size: 14px; }
-
-    /* 状态进度 */
-    .status-bar {
-      background: #090d16;
-      border: 1px solid var(--border);
-      padding: 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      color: #38bdf8;
-      min-height: 42px;
-      display: flex;
-      align-items: center;
-    }
-
-    /* 输入框与画廊 */
-    textarea {
-      width: 100%;
-      background: #0f172a;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text);
-      padding: 12px;
-      font-size: 13px;
-      resize: vertical;
-      line-height: 1.5;
-    }
+    .status-bar { background: #090d16; border: 1px solid var(--border); padding: 12px; border-radius: 6px; font-size: 13px; color: #38bdf8; min-height: 42px; display: flex; align-items: center; }
+    textarea { width: 100%; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 12px; font-size: 13px; resize: vertical; line-height: 1.5; }
     textarea:focus { outline: none; border-color: var(--primary); }
-
-    .gallery-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-      gap: 10px;
-      max-height: 260px;
-      overflow-y: auto;
-      padding: 4px;
-    }
-    .gallery-item {
-      position: relative;
-      border-radius: 6px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      aspect-ratio: 9/16;
-      background: #000;
-    }
+    .gallery-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; max-height: 260px; overflow-y: auto; padding: 4px; }
+    .gallery-item { position: relative; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); aspect-ratio: 9/16; background: #000; }
     .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
-    .gallery-item .badge {
-      position: absolute;
-      bottom: 4px;
-      left: 4px;
-      background: rgba(0, 0, 0, 0.7);
-      color: #fff;
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-
-    /* 提交按钮 */
-    .btn-submit {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      padding: 14px 24px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-      width: 100%;
-    }
-    .btn-submit:hover { background: #059669; }
+    .gallery-item .badge { position: absolute; bottom: 4px; left: 4px; background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+    .btn-submit { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 14px 24px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; }
     .btn-submit:disabled { background: #475569; cursor: not-allowed; }
   </style>
 </head>
@@ -118,42 +42,33 @@
   <div class="container">
     <header>
       <h1>🎬 Pavo AI 视频爆款复刻与华人模特替换工作流</h1>
-      <p>自动提取口播文案 · 智能首尾帧与10秒抽帧 · 华人面孔无缝替换 · 分镜提示词组装</p>
+      <p>自动提取口播文案 · 首尾与10秒抽帧 · 华人面孔无缝替换 · 锁定 Agnes Video 2.5 Flash 免费模型</p>
     </header>
-
     <div class="main-grid">
-      <!-- 左栏：视频上传与状态 -->
       <div class="card">
         <h2>1. 爆款原视频输入</h2>
         <div class="drop-zone" id="dropZone" onclick="document.getElementById('videoFile').click()">
           <p id="dropText">📂 点击或拖拽视频到此处上传<br><span style="font-size: 12px; color: #64748b;">(支持 MP4, MOV, MKV)</span></p>
           <input type="file" id="videoFile" accept="video/*" />
         </div>
-        
         <h2>任务流水线状态</h2>
         <div class="status-bar" id="statusBox">等待上传视频...</div>
       </div>
-
-      <!-- 右栏：文案、抽帧与提示词编辑 -->
       <div class="card">
         <h2>2. 提取口播逐字稿</h2>
-        <textarea id="transcriptBox" rows="4" placeholder="口播内容将在此处展示，可直接在此微调修改..."></textarea>
-
+        <textarea id="transcriptBox" rows="4" placeholder="口播内容展示区..."></textarea>
         <h2>3. 华人模特抽帧预览 (首尾帧 + 每10秒)</h2>
         <div class="gallery-container" id="gallery">
           <div style="color: var(--text-muted); font-size: 13px; grid-column: 1/-1; text-align: center; padding: 20px;">
             暂无图片，上传视频后自动生成
           </div>
         </div>
-
         <h2>4. 对应每十秒分镜提示词 (Prompt)</h2>
-        <textarea id="promptsBox" rows="6" placeholder="分镜提示词将根据模板自动组装生成，可随时增删润色..."></textarea>
-
+        <textarea id="promptsBox" rows="6" placeholder="分镜提示词自动组装区..."></textarea>
         <button class="btn-submit" id="submitBtn" onclick="sendToPavo()">🚀 确认无误，下发 Pavo AI 渲染成片</button>
       </div>
     </div>
   </div>
-
   <script>
     const fileInput = document.getElementById('videoFile');
     const dropZone = document.getElementById('dropZone');
@@ -163,41 +78,31 @@
     const gallery = document.getElementById('gallery');
     const submitBtn = document.getElementById('submitBtn');
 
-    // 拖拽事件监听
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
     dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
     dropZone.addEventListener('drop', (e) => {
       e.preventDefault();
       dropZone.classList.remove('dragover');
-      if (e.dataTransfer.files.length) {
-        fileInput.files = e.dataTransfer.files;
-        handleUpload();
-      }
+      if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; handleUpload(); }
     });
     fileInput.addEventListener('change', handleUpload);
 
-    // 自动上传与解析流程
     async function handleUpload() {
       const file = fileInput.files[0];
       if (!file) return;
-
       document.getElementById('dropText').innerText = `已选视频: ${file.name}`;
-      statusBox.innerText = "⏳ 正在上传视频并进行多任务分析 (提取口播、抽帧换脸中)...";
+      statusBox.innerText = "⏳ 正在提取口播并执行换脸与抽帧...";
       submitBtn.disabled = true;
 
       const formData = new FormData();
       formData.append("file", file);
-
       try {
         const res = await fetch("/api/process", { method: "POST", body: formData });
         const data = await res.json();
-
         if (data.success) {
-          statusBox.innerText = "✅ 解析完成！请检查右侧口播与提示词，确认后下发生成。";
+          statusBox.innerText = "✅ 解析完成！请检查提示词，确认后下发生成。";
           transcriptBox.value = data.transcript || "";
           promptsBox.value = data.prompts || "";
-          
-          // 渲染关键帧图片
           gallery.innerHTML = "";
           data.frames.forEach((item) => {
             const div = document.createElement("div");
@@ -214,19 +119,14 @@
       }
     }
 
-    // 确认下发至 Pavo AI
     async function sendToPavo() {
       submitBtn.disabled = true;
-      statusBox.innerText = "🚀 正在将分镜数据与关键帧下发至 Pavo AI 任务队列...";
-      
+      statusBox.innerText = "🚀 正在下发至 Pavo AI 免费模型任务队列...";
       try {
         const res = await fetch("/api/submit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            transcript: transcriptBox.value,
-            prompts: promptsBox.value
-          })
+          body: JSON.stringify({ transcript: transcriptBox.value, prompts: promptsBox.value })
         });
         const data = await res.json();
         if (data.success) {
