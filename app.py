@@ -12,81 +12,87 @@ from core.pavo_runner import PavoRunner
 with open("config.json", "r", encoding="utf-8") as f:
     config = json.load(f)
 
-# 初始化业务组件
+# 初始化组件
 transcriber = VideoTranscriber(model_size="base")
-extractor = VideoExtractor(interval_seconds=config["prompt_template"].get("interval_seconds", 10))
+extractor = VideoExtractor(interval_seconds=config.get("prompt_template", {}).get("interval_seconds", 10))
 replacer = FaceReplacer(chinese_faces_dir="chinese_faces")
-prompt_builder = PromptBuilder(config["prompt_template"])
-runner = PavoRunner(token=config["pavo"]["auth_token"])
+prompt_builder = PromptBuilder(config.get("prompt_template", {}))
+runner = PavoRunner(token=config.get("pavo", {}).get("auth_token", ""))
 
-# 全局暂存变量
-state = {
-    "swapped_images": [],
-    "frames_info": []
+# 全局状态缓存当前处理的任务
+current_job = {
+    "prompts": "",
+    "frames": []
 }
 
-def analyze_video(video_path):
+def auto_process_video(video_path):
+    """用户上传视频后，自动触发：提取文案 -> 抽帧换脸 -> 生成提示词"""
     if not video_path:
-        return "请先上传视频", [], ""
+        return "", [], "", "⚠️ 请上传视频文件！"
 
     output_dir = "output_assets"
-    raw_frames_dir = os.path.join(output_dir, "raw_frames")
-    swapped_frames_dir = os.path.join(output_dir, "swapped_frames")
+    raw_frames = os.path.join(output_dir, "raw_frames")
+    swapped_frames = os.path.join(output_dir, "swapped_frames")
 
-    # 1. 提取完整口播
+    # 1. Whisper 提取口播
+    yield "⏳ 正在提取口播逐字稿...", [], "", "处理中..."
     transcript = transcriber.extract_transcript(video_path, output_dir)
 
     # 2. 抽帧（首尾帧 + 每10秒）
-    frames_info = extractor.extract_keyframes(video_path, raw_frames_dir)
-    state["frames_info"] = frames_info
+    yield transcript, [], "⏳ 正在抽帧并替换华人模特...", "处理中..."
+    frames_info = extractor.extract_keyframes(video_path, raw_frames)
 
-    # 3. 替换随机华人面孔
-    swapped_paths = replacer.replace_faces_in_frames(frames_info, swapped_frames_dir)
-    state["swapped_images"] = swapped_paths
+    # 3. 换脸
+    swapped_paths = replacer.replace_faces_in_frames(frames_info, swapped_frames)
+    current_job["frames"] = swapped_paths
 
-    # 4. 套用模板生成分镜提示词
+    # 4. 生成提示词
     prompts_text = prompt_builder.build_prompts(frames_info, transcript)
+    current_job["prompts"] = prompts_text
 
-    return transcript, swapped_paths, prompts_text
+    yield transcript, swapped_paths, prompts_text, "✅ 解析完成！请检查/微调下方提示词，确认后点击下方按钮下发生图/视频"
 
-def submit_to_pavo(confirmed_transcript, confirmed_prompts):
-    if not state["swapped_images"]:
-        return "❌ 尚未生成关键帧与提示词，请先上传并解析视频！"
+def trigger_pavo_generation(confirmed_prompts):
+    """用户确认无误后，真正发送到 Pavo 生成视频"""
+    if not current_job["frames"]:
+        return "❌ 尚未解析视频，无法提交"
+    
+    # 提交最终确认的提示词和换好脸的关键帧
+    runner.trigger_generation(confirmed_prompts, current_job["frames"])
+    return "🚀 已成功下发 Pavo AI 工作流！正在云端批量渲染视频..."
 
-    success = runner.trigger_generation(confirmed_prompts, state["swapped_images"])
-    if success:
-        return "✅ 已成功提交至 Pavo AI 工作流！所有分镜与华人首尾帧已开始排队渲染。"
-    return "❌ 提交失败，请检查网络或配置中的 Pavo Token。"
-
-# 构建 Gradio 交互界面
-with gr.Blocks(title="Pavo AI 视频分镜复刻控制台") as demo:
-    gr.Markdown("# 🎬 爆款视频分镜重构与华人模特复刻控制台")
-
+# 构建界面
+with gr.Blocks(title="Pavo AI 视频爆款复刻工作流") as demo:
+    gr.Markdown("# 🚀 爆款视频智能分镜复刻与华人模特替换")
+    
     with gr.Row():
         with gr.Column(scale=1):
-            video_input = gr.Video(label="1. 上传爆款原视频")
-            analyze_btn = gr.Button("⚡ 开始提取文案、抽帧换脸并生成提示词", variant="primary")
+            # 设置 upload 事件：视频上传完成直接自动开始解析！
+            video_input = gr.Video(label="上传爆款视频（拖入后自动触发解析）")
+            status_box = gr.Label(label="当前进度状态")
 
         with gr.Column(scale=2):
-            transcript_box = gr.Textbox(label="完整口播文案（确认/微调）", lines=5)
-            prompts_box = gr.Textbox(label="每十秒视频分镜提示词（确认/微调）", lines=8)
-            frames_gallery = gr.Gallery(label="替换华人模特后的抽帧（首尾帧 + 每10秒）", columns=3, height=280)
+            transcript_box = gr.Textbox(label="1. 提取的完整口播文案（可编辑）", lines=4)
+            frames_gallery = gr.Gallery(label="2. 首尾帧及每10秒关键帧（已替换随机华人）", columns=3, height=260)
+            prompts_box = gr.Textbox(label="3. 生成的分镜提示词（可根据需要微调）", lines=6)
 
     with gr.Row():
-        confirm_btn = gr.Button("🚀 确认无误，下发 Pavo AI 生成视频", variant="stop")
-        status_output = gr.Label(label="执行状态")
+        confirm_btn = gr.Button("🔥 确认无误，下发 Pavo AI 生成视频", variant="primary", size="lg")
+        result_label = gr.Label(label="执行结果")
 
-    analyze_btn.click(
-        fn=analyze_video,
+    # 只要视频一上传，立即自动开始流水线（无需手动按开始按钮）
+    video_input.upload(
+        fn=auto_process_video,
         inputs=[video_input],
-        outputs=[transcript_box, frames_gallery, prompts_box]
+        outputs=[transcript_box, frames_gallery, prompts_box, status_box]
     )
 
+    # 确认后提交
     confirm_btn.click(
-        fn=submit_to_pavo,
-        inputs=[transcript_box, prompts_box],
-        outputs=[status_output]
+        fn=trigger_pavo_generation,
+        inputs=[prompts_box],
+        outputs=[result_label]
     )
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.queue().launch(server_name="0.0.0.0", server_port=7860)
