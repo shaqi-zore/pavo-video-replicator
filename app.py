@@ -1,6 +1,11 @@
 import os
 import json
-import gradio as gr
+import shutil
+from fastapi import FastAPI, UploadFile, File
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+import uvicorn
 
 from core.transcriber import VideoTranscriber
 from core.extractor import VideoExtractor
@@ -8,91 +13,112 @@ from core.face_swap import FaceReplacer
 from core.prompt_builder import PromptBuilder
 from core.pavo_runner import PavoRunner
 
-# 加载配置
+app = FastAPI(title="Pavo AI Automation Pipeline")
+
+# 确保必要的本地存储目录存在
+os.makedirs("uploads", exist_ok=True)
+os.makedirs("static", exist_ok=True)
+os.makedirs("output_assets/swapped_frames", exist_ok=True)
+os.makedirs("output_assets/raw_frames", exist_ok=True)
+
+# 挂载静态文件与切片图片预览目录
+app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/output_assets", StaticFiles(directory="output_assets"), name="output_assets")
+
+# 读取配置
 with open("config.json", "r", encoding="utf-8") as f:
     config = json.load(f)
 
-# 初始化组件
+# 初始化各核心算法模块
 transcriber = VideoTranscriber(model_size="base")
 extractor = VideoExtractor(interval_seconds=config.get("prompt_template", {}).get("interval_seconds", 10))
 replacer = FaceReplacer(chinese_faces_dir="chinese_faces")
 prompt_builder = PromptBuilder(config.get("prompt_template", {}))
-runner = PavoRunner(token=config.get("pavo", {}).get("auth_token", ""))
 
-# 全局状态缓存当前处理的任务
-current_job = {
+# 强制锁定免费模型 Agnes Video 2.5 Flash
+target_model = config.get("pavo", {}).get("model_name", "Agnes Video 2.5 Flash")
+runner = PavoRunner(
+    token=config.get("pavo", {}).get("auth_token", ""),
+    model_name=target_model
+)
+
+# 内存缓存当前解析任务状态
+task_cache = {
+    "frames": [],
     "prompts": "",
-    "frames": []
+    "transcript": ""
 }
 
-def auto_process_video(video_path):
-    """用户上传视频后，自动触发：提取文案 -> 抽帧换脸 -> 生成提示词"""
-    if not video_path:
-        return "", [], "", "⚠️ 请上传视频文件！"
+class SubmitPayload(BaseModel):
+    transcript: str
+    prompts: str
 
-    output_dir = "output_assets"
-    raw_frames = os.path.join(output_dir, "raw_frames")
-    swapped_frames = os.path.join(output_dir, "swapped_frames")
+@app.get("/")
+async def index():
+    """打开根路径返回前端界面"""
+    return FileResponse("static/index.html")
 
-    # 1. Whisper 提取口播
-    yield "⏳ 正在提取口播逐字稿...", [], "", "处理中..."
-    transcript = transcriber.extract_transcript(video_path, output_dir)
+@app.post("/api/process")
+async def process_video(file: UploadFile = File(...)):
+    """上传视频后自动触发：文案转写 -> 抽首尾帧及10秒间隔 -> 换华人脸 -> 组装提示词"""
+    try:
+        temp_video_path = os.path.join("uploads", file.filename)
+        with open(temp_video_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    # 2. 抽帧（首尾帧 + 每10秒）
-    yield transcript, [], "⏳ 正在抽帧并替换华人模特...", "处理中..."
-    frames_info = extractor.extract_keyframes(video_path, raw_frames)
+        output_dir = "output_assets"
+        raw_frames_dir = os.path.join(output_dir, "raw_frames")
+        swapped_frames_dir = os.path.join(output_dir, "swapped_frames")
 
-    # 3. 换脸
-    swapped_paths = replacer.replace_faces_in_frames(frames_info, swapped_frames)
-    current_job["frames"] = swapped_paths
+        # 1. Whisper 提取口播逐字稿
+        transcript = transcriber.extract_transcript(temp_video_path, output_dir)
 
-    # 4. 生成提示词
-    prompts_text = prompt_builder.build_prompts(frames_info, transcript)
-    current_job["prompts"] = prompts_text
+        # 2. 抽帧：首帧、尾帧、每10秒关键帧
+        frames_info = extractor.extract_keyframes(temp_video_path, raw_frames_dir)
 
-    yield transcript, swapped_paths, prompts_text, "✅ 解析完成！请检查/微调下方提示词，确认后点击下方按钮下发生图/视频"
+        # 3. 换脸：随机匹配华人模特面孔
+        swapped_paths = replacer.replace_faces_in_frames(frames_info, swapped_frames_dir)
 
-def trigger_pavo_generation(confirmed_prompts):
-    """用户确认无误后，真正发送到 Pavo 生成视频"""
-    if not current_job["frames"]:
-        return "❌ 尚未解析视频，无法提交"
-    
-    # 提交最终确认的提示词和换好脸的关键帧
-    runner.trigger_generation(confirmed_prompts, current_job["frames"])
-    return "🚀 已成功下发 Pavo AI 工作流！正在云端批量渲染视频..."
+        # 4. 根据模板生成各分镜提示词
+        prompts_text = prompt_builder.build_prompts(frames_info, transcript)
 
-# 构建界面
-with gr.Blocks(title="Pavo AI 视频爆款复刻工作流") as demo:
-    gr.Markdown("# 🚀 爆款视频智能分镜复刻与华人模特替换")
-    
-    with gr.Row():
-        with gr.Column(scale=1):
-            # 设置 upload 事件：视频上传完成直接自动开始解析！
-            video_input = gr.Video(label="上传爆款视频（拖入后自动触发解析）")
-            status_box = gr.Label(label="当前进度状态")
+        # 缓存状态供确认下发时读取
+        task_cache["frames"] = swapped_paths
+        task_cache["prompts"] = prompts_text
+        task_cache["transcript"] = transcript
 
-        with gr.Column(scale=2):
-            transcript_box = gr.Textbox(label="1. 提取的完整口播文案（可编辑）", lines=4)
-            frames_gallery = gr.Gallery(label="2. 首尾帧及每10秒关键帧（已替换随机华人）", columns=3, height=260)
-            prompts_box = gr.Textbox(label="3. 生成的分镜提示词（可根据需要微调）", lines=6)
+        # 封装给前端展示的图片列表
+        frames_response = []
+        for idx, p in enumerate(swapped_paths):
+            tag = frames_info[idx].get("tag", "frame") if idx < len(frames_info) else "frame"
+            frames_response.append({
+                "url": f"/{p.replace(os.sep, '/')}",
+                "tag": tag
+            })
 
-    with gr.Row():
-        confirm_btn = gr.Button("🔥 确认无误，下发 Pavo AI 生成视频", variant="primary", size="lg")
-        result_label = gr.Label(label="执行结果")
+        return {
+            "success": True,
+            "transcript": transcript,
+            "prompts": prompts_text,
+            "frames": frames_response
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
-    # 只要视频一上传，立即自动开始流水线（无需手动按开始按钮）
-    video_input.upload(
-        fn=auto_process_video,
-        inputs=[video_input],
-        outputs=[transcript_box, frames_gallery, prompts_box, status_box]
-    )
+@app.post("/api/submit")
+async def submit_to_pavo(payload: SubmitPayload):
+    """用户二次确认后下发 Pavo AI，强制调用 Agnes Video 2.5 Flash 生成视频"""
+    try:
+        frames = task_cache.get("frames", [])
+        if not frames:
+            return {"success": False, "error": "未检测到已处理的关键帧图片"}
 
-    # 确认后提交
-    confirm_btn.click(
-        fn=trigger_pavo_generation,
-        inputs=[prompts_box],
-        outputs=[result_label]
-    )
+        success = runner.trigger_generation(payload.prompts, frames)
+        if success:
+            return {"success": True}
+        return {"success": False, "error": "Pavo 任务调度失败"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 if __name__ == "__main__":
-    demo.queue().launch(server_name="0.0.0.0", server_port=7860)
+    uvicorn.run(app, host="0.0.0.0", port=7860)
