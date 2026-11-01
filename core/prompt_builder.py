@@ -2,31 +2,37 @@ import pypinyin
 
 class PromptBuilder:
     def __init__(self):
-        # 针对不同性别和年龄段的配音精细描述
-        self.voice_profiles = {
+        # 对应不同性别/年龄的全新人物外貌与服饰设定（彻底替换原人物特征）
+        self.character_styles = {
             ("female", "young"): {
-                "desc": "one native mainland Chinese young female speaker, clear and natural tone, youthful cadence",
-                "label": "young female"
+                "appearance": "A young Chinese woman in her early 20s, clean ponytail hair, wearing modern minimalist cream-white knitted cardigan",
+                "voice_desc": "one native mainland Chinese young female speaker, clear and natural tone, youthful cadence",
+                "voice_label": "young female"
             },
             ("female", "mid"): {
-                "desc": "one native mainland Chinese mature female speaker, warm, intellectual and confident tone",
-                "label": "mid-age female"
+                "appearance": "An elegant Chinese woman in her 30s-40s, stylish shoulder-length hair, wearing a premium dark green modern tea-art linen blouse",
+                "voice_desc": "one native mainland Chinese mature female speaker, warm, intellectual and confident tone",
+                "voice_label": "mid-age female"
             },
             ("female", "older"): {
-                "desc": "one native mainland Chinese older female speaker, kind, gentle, maternal and steady tone",
-                "label": "senior female"
+                "appearance": "A kind-looking Chinese senior woman in her 60s, neat silver-black bun hair, wearing an embroidered traditional cotton jacket",
+                "voice_desc": "one native mainland Chinese older female speaker, gentle and steady tone",
+                "voice_label": "senior female"
             },
             ("male", "young"): {
-                "desc": "one native mainland Chinese young male speaker, energetic, clear and authentic",
-                "label": "young male"
+                "appearance": "A clean-shaven young Chinese man in his 20s, stylish modern short haircut, wearing a casual gray crewneck sweater",
+                "voice_desc": "one native mainland Chinese young male speaker, energetic, clear and authentic",
+                "voice_label": "young male"
             },
             ("male", "mid"): {
-                "desc": "one native mainland Chinese middle-aged male speaker, calm, grounded and professional delivery",
-                "label": "middle-aged male"
+                "appearance": "A refined middle-aged Chinese gentleman in his 40s, neat classic haircut, wearing a charcoal-gray Zen style linen shirt",
+                "voice_desc": "one native mainland Chinese middle-aged male speaker, calm, grounded and professional delivery",
+                "voice_label": "middle-aged male"
             },
             ("male", "older"): {
-                "desc": "one native mainland Chinese senior male speaker, authoritative, steady, wise and resonant voice",
-                "label": "senior male"
+                "appearance": "A distinguished senior Chinese gentleman in his 60s, natural salt-and-pepper hair, wearing a traditional dark navy silk-blend Tang suit",
+                "voice_desc": "one native mainland Chinese senior male speaker, authoritative, steady and resonant voice",
+                "voice_label": "senior male"
             }
         }
 
@@ -39,7 +45,6 @@ class PromptBuilder:
             return "older"
 
     def _chinese_to_pinyin(self, text: str) -> str:
-        """自动将中文字幕逐字稿转换为带调拼音，作为语音引擎的发音引导"""
         if not text:
             return ""
         pinyin_list = pypinyin.lazy_pinyin(text, style=pypinyin.Style.TONE)
@@ -57,31 +62,33 @@ class PromptBuilder:
         gender = meta.get("gender", "male")
         age = meta.get("age", 45)
         bracket = self._get_age_bracket(age)
-        voice_info = self.voice_profiles.get((gender, bracket), self.voice_profiles[("male", "mid")])
+        style = self.character_styles.get((gender, bracket), self.character_styles[("male", "mid")])
 
-        # 拼音音素引导
-        clean_text = dialogue_text.strip() if dialogue_text else "自然展示产品，保持生活化解说状态。"
+        clean_text = dialogue_text.strip() if dialogue_text else "在家里点松塔香，每天点上一根就可以了。"
         pinyin_text = self._chinese_to_pinyin(clean_text)
 
+        # 核心改动：在 REFERENCES 和 PRODUCT LOCK 中明确指示替换全身体型与服饰，仅保留桌景与商品
         prompt = f"""Generate exactly 10 seconds of 9:16 photorealistic image-to-video.
 
-REFERENCES:
-Use {frame_filename} as the actual first frame and the actor, clothing, composition and background reference.
-Preserve authentic East Asian facial features, natural skin texture, detailed eyes, clothing folds and original background elements.
-Remove the reference image's baked-in captions, watermarks or UI icons before animation. Reconstruct the underlying elements naturally.
+REFERENCES & SUBJECT REPLACEMENT:
+Use {frame_filename} as composition, table setup and background reference.
+OVERRIDE AND REPLACE THE ACTOR: Completely replace the person with {style['appearance']}.
+Replace head, hair, body physique and clothing completely according to the new persona.
+Retain only the original room background, lighting mood and tabletop composition.
+Remove any reference baked-in subtitles, text watermarks or overlays.
 
 PRODUCT AND HAND LOCK:
-Maintain consistent hand posture without unnatural warping, phantom extra fingers or disappearing items.
-Both hands hold or gesture naturally according to the visual reference.
-All tabletop props, product vessels, and micro-details remain geometrically stable throughout.
-No morphing items, random pickup extractions, hand swaps or sudden visual anomalies.
+The actor's new hands hold or gesture naturally according to the dialogue.
+Both hands remain empty of foreign objects; no extra phantom fingers or morphing.
+The identical incense stick and burner setup on the table remain 100% stable in geometry and position.
+Preserve all tabletop decor, miniature landscape and props exactly as shown.
+No disappearing objects, sudden product swaps or hand warping.
 
 ACTION:
-Maintain natural seated posture and realistic, subtle micro-movements.
-Match mouth opening and lip sync precisely to the Chinese speech delivery.
-Deliver natural explanatory hand gestures that correlate rhythmically with dialogue pauses.
-Realistic subtle eye blinks, chest micro-rise breathing and steady head movements.
-Keep the camera locked on tripod, no erratic zoom, sudden cuts or wild camera swing.
+The new Chinese actor begins seated, leaning slightly forward, naturally presenting and explaining the product.
+Natural lip sync and mouth shapes matching the Chinese speech rhythm precisely.
+Natural head tilt, subtle blinks, and realistic chest rise breathing.
+Camera is locked steadily on tripod; no wild shaking or abrupt zooms.
 
 EXACT CHINESE DIALOGUE:
 “{clean_text}”
@@ -90,33 +97,27 @@ FULL PINYIN — SILENT GUIDANCE:
 {pinyin_text}
 
 UNIFIED VOICE:
-Use {voice_info['desc']}.
-Establish a natural {voice_info['label']} voice consistent across all {total_segments} segments.
-Keep pitch, timbre, accent, volume and microphone acoustic space identical.
-Clear standard Mandarin, zero foreign accent, no slurring or synthetic robotic tone.
+Use {style['voice_desc']}.
+Establish a natural {style['voice_label']} voice consistent across all {total_segments} segments.
+Clear Mandarin, zero foreign accent, studio clean acoustics.
 
 DELIVERY:
-Begin speaking immediately with clear, conversational pacing and authentic emotion.
-Aim to finish speaking around 9.2-9.5 seconds within the 10-second boundary.
-Speak every supplied word exactly once, no word omission, hallucinated syllables or repetition.
+Begin speaking immediately with clear, efficient delivery.
+Aim to finish around 9.2-9.5 seconds within the 10-second boundary.
+Speak every supplied word exactly once.
 Pinyin is silent acoustic guidance only, strictly never spoken aloud or rendered on screen.
-During the remaining split-second hold, maintain subtle breathing and a relaxed pose suitable for continuous loop.
 
 EDITING OVERLAYS:
-Strictly no subtitles, headlines, animated stickers, logos, promotional tickers or decorative overlays.
-Zero watermarks or synthetic UI elements.
-Preserve original color balance, realistic ambient shadows and unchanged directional lighting.
-Clean room ambience with pure spoken voice, no added background music, sirens or extraneous sound effects."""
+Strictly no subtitles, headlines, animated stickers or decorative overlays.
+Natural thin smoke rising steadily, locked camera and realistic ambient room lighting."""
 
         return prompt.strip()
 
     def build_full_task_prompts(self, frames_info: list, transcript_segments: list, meta: dict = None) -> list:
-        """为所有切分的 10 秒关键帧批量组装结构化分镜提示词"""
         total_segments = len(frames_info)
         prompts = []
         for i, frame in enumerate(frames_info):
-            frame_file = f"swapped_frame_{i+1:02d}.jpg"
-            # 匹配对应时间切片的字幕，如无切片则回退
+            frame_file = f"frame_{i+1:02d}.jpg"
             text = transcript_segments[i] if i < len(transcript_segments) else ""
             seg_prompt = self.build_prompt_for_segment(
                 frame_filename=frame_file,
