@@ -1,0 +1,11 @@
+{
+  "pavo": {
+    "auth_token": "YOUR_PAVO_AUTH_TOKEN",
+    "project_id": ""
+  },
+  "prompt_template": {
+    "default_character": "cinematic shot of a 25-year-old Chinese model, authentic East Asian facial features, natural skin texture, realistic expression",
+    "style_suffix": "photorealistic, 8k resolution, cinematic lighting, masterpiece --ar 9:16",
+    "interval_seconds": 10
+  }
+}
