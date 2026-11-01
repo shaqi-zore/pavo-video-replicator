@@ -1,85 +1,112 @@
 import os
-import re
-import random
 import cv2
-from typing import List, Tuple, Dict
+import glob
+import insightface
+from insightface.app import FaceAnalysis
 
 class FaceReplacer:
-    def __init__(self, chinese_faces_dir: str = "chinese_faces"):
-        self.chinese_faces_dir = chinese_faces_dir
-        self.face_banks = []
-        self.app = None
-        self.swapper = None
-        self._init_models()
+    def __init__(self, model_path: str = "models/inswapper_128.onnx", faces_dir: str = "chinese_faces"):
+        self.model_path = model_path
+        self.faces_dir = faces_dir
 
-    def _init_models(self):
+        # 优先使用 CUDA 运算，若显卡耗尽或不可用则自动降级到 CPU
         try:
-            import insightface
-            from insightface.app import FaceAnalysis
-            self.app = FaceAnalysis(name='buffalo_l')
-            self.app.prepare(ctx_id=0, det_size=(640, 640))
-            model_path = os.path.join("models", "inswapper_128.onnx")
-            if os.path.exists(model_path):
-                self.swapper = insightface.model_zoo.get_model(model_path, download=False)
-            self._load_chinese_faces()
+            import onnxruntime as ort
+            available_providers = ort.get_available_providers()
+            if "CUDAExecutionProvider" in available_providers:
+                providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+            else:
+                providers = ['CPUExecutionProvider']
         except Exception:
-            pass
+            providers = ['CPUExecutionProvider']
 
-    def _parse_filename(self, filename: str) -> Dict[str, str]:
-        """解析类似 female_20.jpg 或 male_45.jfif"""
-        name_lower = filename.lower()
-        gender = "female" if name_lower.startswith("female") else "male"
-        
-        # 提取文件名中的数字作为年龄
-        age_match = re.search(r'\d+', name_lower)
-        age = int(age_match.group()) if age_match else 25
-        return {"gender": gender, "age": age}
+        # 初始化人脸分析检测器 (buffalo_l)
+        self.app = FaceAnalysis(name='buffalo_l', providers=providers)
+        self.app.prepare(ctx_id=0, det_size=(640, 640))
 
-    def _load_chinese_faces(self):
-        if not os.path.exists(self.chinese_faces_dir) or not self.app:
-            return
-        for file in os.listdir(self.chinese_faces_dir):
-            if file.lower().endswith(('.jpg', '.png', '.jpeg', '.jfif')):
-                img_path = os.path.join(self.chinese_faces_dir, file)
-                img = cv2.imread(img_path)
-                faces = self.app.get(img)
-                if faces:
-                    meta = self._parse_filename(file)
-                    self.face_banks.append({
-                        "face": faces[0],
-                        "gender": meta["gender"],
-                        "age": meta["age"],
-                        "filename": file
-                    })
-
-    def replace_faces_in_frames(self, frames_info: List[dict], output_dir: str) -> Tuple[List[str], Dict]:
-        os.makedirs(output_dir, exist_ok=True)
-        processed_paths = []
-        
-        # 默认元数据
-        selected_meta = {"gender": "female", "age": 25, "filename": "default"}
-        target_item = None
-
-        if self.face_banks:
-            target_item = random.choice(self.face_banks)
-            selected_meta = {
-                "gender": target_item["gender"],
-                "age": target_item["age"],
-                "filename": target_item["filename"]
-            }
-            print(f"[FaceReplacer] 选中底模: {selected_meta['filename']} (性别: {selected_meta['gender']}, 年龄: {selected_meta['age']})")
-
-        for item in frames_info:
-            src_path = item["file_path"]
-            img = cv2.imread(src_path)
-            if self.swapper and target_item and self.app:
-                faces = self.app.get(img)
-                if faces:
-                    for f in faces:
-                        img = self.swapper.get(img, f, target_item["face"], paste_back=True)
-
-            out_path = os.path.join(output_dir, f"swapped_{os.path.basename(src_path)}")
-            cv2.imwrite(out_path, img)
-            processed_paths.append(out_path)
+        # 加载人脸替换核心权重 inswapper_128.onnx
+        if not os.path.exists(self.model_path):
+            raise FileNotFoundError(f"未找到人脸模型文件: {self.model_path}，请确保已下载到 models 目录！")
             
-        return processed_paths, selected_meta
+        self.swapper = insightface.model_zoo.get_model(
+            self.model_path, 
+            download=False, 
+            providers=providers
+        )
+
+    def _parse_meta_from_filename(self, filename: str) -> dict:
+        """从底模文件名中提取性别和年龄，如: female_25.jpg -> {'gender': 'female', 'age': 25}"""
+        base = os.path.splitext(os.path.basename(filename))[0]
+        parts = base.split('_')
+        gender = "male"
+        age = 30
+        if len(parts) >= 2:
+            gender = parts[0].lower()
+            try:
+                age = int(parts[1])
+            except ValueError:
+                age = 30
+        return {"gender": gender, "age": age, "filename": filename}
+
+    def _find_best_match_face(self, target_gender: str = None, target_age: int = None) -> tuple:
+        """从 chinese_faces 目录查找最匹配的底模图片"""
+        image_files = glob.glob(os.path.join(self.faces_dir, "*.[jJ][pP][gG]")) + \
+                      glob.glob(os.path.join(self.faces_dir, "*.[pP][nN][gG]"))
+        
+        if not image_files:
+            return None, {"gender": "male", "age": 30, "filename": ""}
+
+        if not target_gender and not target_age:
+            # 默认返回第一张
+            meta = self._parse_meta_from_filename(image_files[0])
+            return image_files[0], meta
+
+        best_file = image_files[0]
+        min_diff = float("inf")
+        best_meta = self._parse_meta_from_filename(best_file)
+
+        for f in image_files:
+            meta = self._parse_meta_from_filename(f)
+            gender_match = (meta["gender"] == target_gender) if target_gender else True
+            age_diff = abs(meta["age"] - (target_age or 30))
+            score = age_diff if gender_match else age_diff + 100
+
+            if score < min_diff:
+                min_diff = score
+                best_file = f
+                best_meta = meta
+
+        return best_file, best_meta
+
+    def swap_face(self, source_img_path: str, target_gender: str = None, target_age: int = None) -> tuple:
+        """
+        对目标首帧图片进行华人模特换脸
+        :param source_img_path: 视频抽出来的 9:16 首帧图片路径
+        :return: (换脸后的 cv2 图像, 匹配到的模特元数据 dict)
+        """
+        target_img = cv2.imread(source_img_path)
+        if target_img is None:
+            raise ValueError(f"无法读取图片: {source_img_path}")
+
+        # 选出匹配的华人底模
+        face_path, meta = self._find_best_match_face(target_gender, target_age)
+        if not face_path:
+            return target_img, meta
+
+        source_face_img = cv2.imread(face_path)
+        source_faces = self.app.get(source_face_img)
+        if not source_faces:
+            return target_img, meta
+        source_face = source_faces[0]
+
+        # 提取原图人脸
+        target_faces = self.app.get(target_img)
+        if not target_faces:
+            return target_img, meta
+
+        # 对原图人脸执行贴脸替换
+        result_img = target_img.copy()
+        for face in target_faces:
+            result_img = self.swapper.get(result_img, face, source_face, paste_back=True)
+
+        return result_img, meta
