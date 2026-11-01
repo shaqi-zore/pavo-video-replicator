@@ -1,143 +1,149 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pavo AI 爆款视频分镜复刻控制台</title>
-  <style>
-    :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --primary: #3b82f6;
-      --accent: #10b981;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
-      --border: #334155;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); padding: 24px; }
-    .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-    header { text-align: center; margin-bottom: 10px; }
-    header h1 { font-size: 26px; color: #fff; margin-bottom: 8px; }
-    header p { color: var(--text-muted); font-size: 14px; }
-    .main-grid { display: grid; grid-template-columns: 1fr 1.6fr; gap: 20px; }
-    @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
-    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-    h2 { font-size: 16px; color: #e2e8f0; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-    .drop-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
-    .drop-zone:hover { border-color: var(--primary); background: rgba(59, 130, 246, 0.05); }
-    .drop-zone input { display: none; }
-    .status-bar { background: #090d16; border: 1px solid var(--border); padding: 12px; border-radius: 6px; font-size: 13px; color: #38bdf8; min-height: 42px; display: flex; align-items: center; }
-    textarea { width: 100%; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 12px; font-size: 13px; resize: vertical; line-height: 1.5; }
-    textarea:focus { outline: none; border-color: var(--primary); }
-    .gallery-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; max-height: 260px; overflow-y: auto; padding: 4px; }
-    .gallery-item { position: relative; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); aspect-ratio: 9/16; background: #000; }
-    .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
-    .gallery-item .badge { position: absolute; bottom: 4px; left: 4px; background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px; }
-    .btn-submit { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 14px 24px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; }
-    .btn-submit:disabled { background: #475569; cursor: not-allowed; }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pavo AI 视频复刻控制台 (审查模式)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <div class="container">
-    <header>
-      <h1>🎬 Pavo AI 视频爆款复刻与华人模特替换工作流</h1>
-      <p>自动提取口播文案 · 首尾与10秒抽帧 · 华人面孔无缝替换 · 锁定 Agnes Video 2.5 Flash 免费模型</p>
+<body class="bg-gray-900 text-gray-100 min-h-screen py-10 px-4">
+  <div class="max-w-5xl mx-auto space-y-8">
+    <header class="text-center">
+      <h1 class="text-3xl font-extrabold text-blue-400">Pavo 视频复刻与换脸生成平台</h1>
+      <p class="text-gray-400 mt-2">严格执行 9:16 规格、10 秒分镜与人物声音强绑定</p>
     </header>
-    <div class="main-grid">
-      <div class="card">
-        <h2>1. 爆款原视频输入</h2>
-        <div class="drop-zone" id="dropZone" onclick="document.getElementById('videoFile').click()">
-          <p id="dropText">📂 点击或拖拽视频到此处上传<br><span style="font-size: 12px; color: #64748b;">(支持 MP4, MOV, MKV)</span></p>
-          <input type="file" id="videoFile" accept="video/*" />
-        </div>
-        <h2>任务流水线状态</h2>
-        <div class="status-bar" id="statusBox">等待上传视频...</div>
+
+    <!-- 第一步：上传与分析 -->
+    <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg">
+      <h2 class="text-xl font-bold mb-4 flex items-center text-gray-200">
+        <span class="bg-blue-600 text-white rounded-full w-6 h-6 inline-flex items-center justify-center mr-2 text-sm">1</span>
+        上传爆款视频
+      </h2>
+      <div class="flex flex-col sm:flex-row gap-4 items-center">
+        <input type="file" id="videoFile" accept="video/*" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer border border-gray-600 rounded-lg">
+        <button id="analyzeBtn" onclick="uploadAndAnalyze()" class="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-bold transition whitespace-nowrap">
+          解析并自动换脸
+        </button>
       </div>
-      <div class="card">
-        <h2>2. 提取口播逐字稿</h2>
-        <textarea id="transcriptBox" rows="4" placeholder="口播内容展示区..."></textarea>
-        <h2>3. 华人模特抽帧预览 (首尾帧 + 每10秒)</h2>
-        <div class="gallery-container" id="gallery">
-          <div style="color: var(--text-muted); font-size: 13px; grid-column: 1/-1; text-align: center; padding: 20px;">
-            暂无图片，上传视频后自动生成
-          </div>
+      <div id="loadingStatus" class="hidden mt-4 text-sm text-yellow-400 animate-pulse">
+        ⏳ 正在抽帧 9:16、听写台词、匹配华人模特换脸中，请稍候约 10-30 秒...
+      </div>
+    </div>
+
+    <!-- 第二步：人工审查与修改区域 -->
+    <div id="reviewSection" class="hidden space-y-6">
+      <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 flex justify-between items-center flex-wrap gap-2">
+        <h2 class="text-xl font-bold flex items-center text-gray-200">
+          <span class="bg-green-600 text-white rounded-full w-6 h-6 inline-flex items-center justify-center mr-2 text-sm">2</span>
+          核对关键帧与提示词
+        </h2>
+        <div id="metaBadge" class="text-sm px-3 py-1 bg-gray-700 rounded-full text-green-300 font-mono"></div>
+      </div>
+
+      <!-- 分镜卡片展示区 -->
+      <div id="cardsContainer" class="space-y-6"></div>
+
+      <!-- 确认提交区域 -->
+      <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-1">Pavo Auth Token</label>
+          <input type="password" id="pavoToken" placeholder="请输入你的 Pavo Auth Token" class="w-full p-2.5 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none">
         </div>
-        <h2>4. 对应每十秒分镜提示词 (Prompt)</h2>
-        <textarea id="promptsBox" rows="6" placeholder="分镜提示词自动组装区..."></textarea>
-        <button class="btn-submit" id="submitBtn" onclick="sendToPavo()">🚀 确认无误，下发 Pavo AI 渲染成片</button>
+        <button id="submitBtn" onclick="submitFinalGeneration()" class="w-full py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold text-lg text-white transition shadow-lg">
+          ✅ 确认无误，下一步生成视频
+        </button>
+        <div id="submitStatus" class="hidden text-sm text-center text-green-400 font-semibold"></div>
       </div>
     </div>
   </div>
+
   <script>
-    const fileInput = document.getElementById('videoFile');
-    const dropZone = document.getElementById('dropZone');
-    const statusBox = document.getElementById('statusBox');
-    const transcriptBox = document.getElementById('transcriptBox');
-    const promptsBox = document.getElementById('promptsBox');
-    const gallery = document.getElementById('gallery');
-    const submitBtn = document.getElementById('submitBtn');
+    let currentSegments = [];
 
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('dragover');
-      if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; handleUpload(); }
-    });
-    fileInput.addEventListener('change', handleUpload);
-
-    async function handleUpload() {
-      const file = fileInput.files[0];
-      if (!file) return;
-      document.getElementById('dropText').innerText = `已选视频: ${file.name}`;
-      statusBox.innerText = "⏳ 正在提取口播并执行换脸与抽帧...";
-      submitBtn.disabled = true;
+    async function uploadAndAnalyze() {
+      const fileInput = document.getElementById("videoFile");
+      if (!fileInput.files[0]) {
+        alert("请先选择视频文件！");
+        return;
+      }
 
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", fileInput.files[0]);
+
+      document.getElementById("loadingStatus").classList.remove("hidden");
+      document.getElementById("analyzeBtn").disabled = true;
+
       try {
-        const res = await fetch("/api/process", { method: "POST", body: formData });
+        const res = await fetch("/api/analyze", { method: "POST", body: formData });
         const data = await res.json();
-        if (data.success) {
-          statusBox.innerText = "✅ 解析完成！请检查提示词，确认后下发生成。";
-          transcriptBox.value = data.transcript || "";
-          promptsBox.value = data.prompts || "";
-          gallery.innerHTML = "";
-          data.frames.forEach((item) => {
-            const div = document.createElement("div");
-            div.className = "gallery-item";
-            div.innerHTML = `<img src="${item.url}" /><span class="badge">${item.tag}</span>`;
-            gallery.appendChild(div);
-          });
-          submitBtn.disabled = false;
-        } else {
-          statusBox.innerText = `❌ 处理失败: ${data.error}`;
-        }
+
+        currentSegments = data.segments;
+        document.getElementById("metaBadge").innerText = `已匹配底模: ${data.model_used} | ${data.gender === 'female' ? '女性' : '男性'} | ${data.age} 岁`;
+
+        const container = document.getElementById("cardsContainer");
+        container.innerHTML = "";
+
+        data.segments.forEach((seg, idx) => {
+          const card = document.createElement("div");
+          card.className = "bg-gray-800 p-5 rounded-xl border border-gray-700 flex flex-col md:flex-row gap-6 items-start";
+          card.innerHTML = `
+            <div class="flex-shrink-0 w-full md:w-52 text-center">
+              <span class="inline-block mb-2 text-xs font-bold text-blue-400 uppercase tracking-wider">分镜 ${seg.segment_index} (10s)</span>
+              <img src="${seg.image_url}" class="w-full h-auto aspect-[9/16] object-cover rounded-lg border border-gray-600 shadow" alt="换脸后首帧">
+            </div>
+            <div class="flex-1 w-full space-y-2">
+              <label class="block text-sm font-semibold text-gray-300">生成的结构化提示词 (可直接在线编辑)：</label>
+              <textarea id="prompt_${idx}" rows="14" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-xs font-mono text-gray-200 focus:border-blue-500 focus:outline-none">${seg.prompt}</textarea>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+
+        document.getElementById("reviewSection").classList.remove("hidden");
       } catch (err) {
-        statusBox.innerText = `❌ 请求异常: ${err.message}`;
+        alert("分析视频失败，请检查控制台或终端日志！");
+      } finally {
+        document.getElementById("loadingStatus").classList.add("hidden");
+        document.getElementById("analyzeBtn").disabled = false;
       }
     }
 
-    async function sendToPavo() {
+    async function submitFinalGeneration() {
+      const token = document.getElementById("pavoToken").value.trim();
+      if (!token) {
+        alert("请先填写 Pavo Auth Token！");
+        return;
+      }
+
+      const submitBtn = document.getElementById("submitBtn");
+      const submitStatus = document.getElementById("submitStatus");
       submitBtn.disabled = true;
-      statusBox.innerText = "🚀 正在下发至 Pavo AI 免费模型任务队列...";
+      submitBtn.innerText = "⏳ 正在下发生成任务到 Pavo AI...";
+
+      const payloadSegments = currentSegments.map((seg, idx) => {
+        return {
+          segment_index: seg.segment_index,
+          image_url: seg.image_url,
+          prompt: document.getElementById(`prompt_${idx}`).value
+        };
+      });
+
       try {
-        const res = await fetch("/api/submit", {
+        const res = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: transcriptBox.value, prompts: promptsBox.value })
+          body: JSON.stringify({ token: token, segments: payloadSegments })
         });
-        const data = await res.json();
-        if (data.success) {
-          statusBox.innerText = "🎉 任务已成功派发至 Pavo AI！成片渲染中。";
-        } else {
-          statusBox.innerText = `❌ 下发失败: ${data.error}`;
-          submitBtn.disabled = false;
-        }
+        const result = await res.json();
+
+        submitStatus.innerText = result.message || "任务已成功提交！";
+        submitStatus.classList.remove("hidden");
+        alert(result.message || "任务已提交！");
       } catch (err) {
-        statusBox.innerText = `❌ 网络异常: ${err.message}`;
+        alert("提交生成失败，请检查网络或后端接口！");
+      } finally {
         submitBtn.disabled = false;
+        submitBtn.innerText = "✅ 确认无误，下一步生成视频";
       }
     }
   </script>
