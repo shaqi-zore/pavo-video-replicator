@@ -1,7 +1,8 @@
 {
   "pavo": {
     "auth_token": "YOUR_PAVO_AUTH_TOKEN",
-    "project_id": ""
+    "project_id": "",
+    "model_name": "Agnes Video 2.5 Flash"
   },
   "prompt_template": {
     "default_character": "cinematic shot of a 25-year-old Chinese model, authentic East Asian facial features, natural skin texture, realistic expression",
