@@ -5,9 +5,10 @@ import insightface
 from insightface.app import FaceAnalysis
 
 class FaceReplacer:
-    def __init__(self, model_path: str = "models/inswapper_128.onnx", faces_dir: str = "chinese_faces"):
+    def __init__(self, model_path: str = "models/inswapper_128.onnx", chinese_faces_dir: str = "chinese_faces", faces_dir: str = None):
         self.model_path = model_path
-        self.faces_dir = faces_dir
+        # 兼容两种参数传法，避免报错
+        self.faces_dir = faces_dir if faces_dir is not None else chinese_faces_dir
 
         # 优先使用 CUDA 运算，若显卡耗尽或不可用则自动降级到 CPU
         try:
@@ -57,7 +58,6 @@ class FaceReplacer:
             return None, {"gender": "male", "age": 30, "filename": ""}
 
         if not target_gender and not target_age:
-            # 默认返回第一张
             meta = self._parse_meta_from_filename(image_files[0])
             return image_files[0], meta
 
@@ -88,7 +88,6 @@ class FaceReplacer:
         if target_img is None:
             raise ValueError(f"无法读取图片: {source_img_path}")
 
-        # 选出匹配的华人底模
         face_path, meta = self._find_best_match_face(target_gender, target_age)
         if not face_path:
             return target_img, meta
@@ -99,12 +98,10 @@ class FaceReplacer:
             return target_img, meta
         source_face = source_faces[0]
 
-        # 提取原图人脸
         target_faces = self.app.get(target_img)
         if not target_faces:
             return target_img, meta
 
-        # 对原图人脸执行贴脸替换
         result_img = target_img.copy()
         for face in target_faces:
             result_img = self.swapper.get(result_img, face, source_face, paste_back=True)
